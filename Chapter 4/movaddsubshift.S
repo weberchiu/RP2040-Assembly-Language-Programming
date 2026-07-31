@@ -1,97 +1,95 @@
+@ U13157116 邱偉柏
+@ MOV / ADD / SUB / 位移指令的使用範例
 @
-@ Examples of the MOV/ADD/SUB/Shift instructions.
-@
 
-.thumb_func		    @ Necessary because sdk uses BLX
-.global main	            @ Provide program starting address to linker
+.thumb_func        @ 必要設定：因為 SDK 使用 BLX 指令，需指定為 Thumb 模式
+.global main       @ 將程式進入點（main）匯出給連結器（Linker）
 
-main:	BL	stdio_init_all	@ initialize uart or usb
+main:	BL	stdio_init_all	@ 初始化 UART 或 USB 標準輸入輸出
 
-after:	MOV	R2, #3		@ Move 3 into register R2
-	MOV	R1, R2		@ R1 is now also 3
-	MOVS	R1, R2		@ the S explicitly states we want the first version.
-	MOV	R9, R2		@ R9 now is 3
+after:	MOV	R2, #3		@ 將立即值 3 放入暫存器 R2
+	MOV	R1, R2		@ 將 R2 的值複製到 R1，R1 現在也是 3
+	MOVS	R1, R2		@ 加了 S 表示運算後會更新條件標記（Flags）
+	MOV	R9, R2		@ 將 R2 的值複製到高位暫存器 R9（R9 現在是 3）
 
-@ we shouldn't play with SP or PC until we know what we're doing.
+@ 在完全瞭解前，不應該隨意操作堆疊指標 (SP) 或程式計數器 (PC)
 	@ MOV	SP, R10	@ SP = R13
 	@ MOV	PC, R11	@ PC = R15
 
-	ADD	R4, R2, #7	@ this immediate allows 3 bits, so values 0-7
-@ R4 is now 10 (3 + 7)
-	ADD	R4, R4, #255	@ this one allows 8-bits, so 0-255
-@ R4 is now 265 (10 + 255)
-	ADD	R4, #255	@ alternate for for R4 = R4 + 255
-@ R4 is now 520(265 + 255) 
-	MOV	R7, #23		@ Can't load high registers with immediate
-	MOV	R11, R7		@ So load R7 and move it
+	ADD	R4, R2, #7	@ 此處的立即值允許 3 個 bit，範圍為 0-7
+@ R4 現在是 10 (3 + 7)
+	ADD	R4, R4, #255	@ 此處允許 8 個 bit，範圍為 0-255
+@ R4 現在是 265 (10 + 255)
+	ADD	R4, #255	@ R4 = R4 + 255 的簡寫形式
+@ R4 現在是 520 (265 + 255) 
+	MOV	R7, #23		@ 無法直接將立即值載入高位暫存器（R8-R15）
+	MOV	R11, R7		@ 因此先載入低位暫存器 R7 再轉移至 R11
 	MOV	R7, #54
-	MOV	R10, R7		@ if one source register is the destination, it can be omitted
-	ADD	R10, R10, R11	@ The one instruction to allow high registers
-@ R10 is now 77 (23 + 54)
-	ADD	SP, SP, #508	@ shouldn’t do this without matching subtraction
-	SUB	SP, SP, #508	@ Undo the damage.
-	ADD	R4, SP, #1020	@ 8-bit immediate but multiples of 4 so 0-1020 valid
-@ need to check R4 in the debugger since it depends on the value of SP
-@ when I ran I got 0x200423fc but if SDK changes this could change.
+	MOV	R10, R7		@ 若來源暫存器與目標暫存器相同，可省略目標暫存器
+	ADD	R10, R10, R11	@ 這是少數支援高位暫存器的 ADD 指令
+@ R10 現在是 77 (23 + 54)
+	ADD	SP, SP, #508	@ 修改堆疊指標（若沒有對應的減法指令，請勿這麼做）
+	SUB	SP, SP, #508	@ 減去相同數值以復原 SP 的狀態
+	ADD	R4, SP, #1020	@ 8-bit 立即值但必須是 4 的倍數，因此有效範圍為 0-1020
+@ 需要在除錯器中檢查 R4，因為它的數值取決於執行時 SP 的位址
+@ 測試執行時得到的數值為 0x200423fc，但若 SDK 更新，位址可能會有所改變
 
-@ Repeat the above shifts using the Assembler mnemonics.
+@ 使用彙編器助記符重複上述的位移操作
 
-	MOV	R3, #8		@ will use this to shift or rotate 1-byte
-	MOV	R2, #0xFF	@ R2 = 255
+	MOV	R3, #8		@ 後續用於位移或循環位移 1 個位元組 (8 bits)
+	MOV	R2, #0xFF	@ R2 = 255 (位元遮罩 0xFF)
 	MOV	R1, #4		@ R1 = 4
-	LSL	R1, R1, #2	@ Shift register R1 left 2 bits (multiply by 4)
-	LSL	R1, #2		@ Shorter form if the registers are the same
-	LSR	R1, R2, #8	@ Shift R2 right by one bytes and place the result in R1
-	LSR	R1, R3		@ Shift R1 right by the value in R3
-	ASR	R1, #8		@ Arithmetic shift R1 right by one byte
-	ROR	R1, R3		@ Rotate R1 right by value of R3
+	LSL	R1, R1, #2	@ 將 R1 向左邏輯位移 2 個 bit（相當於乘以 4）
+	LSL	R1, #2		@ 若來源與目標暫存器相同時的簡寫形式
+	LSR	R1, R2, #8	@ 將 R2 向右邏輯位移 8 個 bit（1 個位元組），結果存入 R1
+	LSR	R1, R3		@ 將 R1 向右邏輯位移 R3 所指定的值 (8 bits)
+	ASR	R1, #8		@ 將 R1 向右算術位移 1 個位元組（保留正負號位元）
+	ROR	R1, R3		@ 將 R1 向右循環位移 R3 所指定的值 (8 bits)
 
-@ Load 0x12345678 into R3
-@ Initialize R3 with the leftmost byte
-	MOV	R3, #0x12	@ load the first 8-bits
-	LSL	R3, #24	@ shift it left 24 bits into place
-@ Load the next byte into R1
-	MOV	R1, #0x34	@ load the second byte
-	LSL	R1, #16	@ shift it into place
-	ADD	R3, R1		@ add it into R1
-@ repeat for the third byte
-	MOV	R1, #0x56	@ load the third byte
-	LSL	R1, #8		@ shit it into place
-	ADD	R3, R1		@ add it to the sum
-@ for the last byte no shift required
-	MOV	R1, #0x78	@ load the fourth bytes
-	ADD	R3, R1
+@ 將 32 位元數值 0x12345678 載入至 R3
+@ 首先載入最左側的位元組 (最高位元組)
+	MOV	R3, #0x12	@ 載入第一個位元組 (0x12)
+	LSL	R3, #24	@ 向左位移 24 個 bit 到對應的位置
+@ 將下一個位元組載入至 R1
+	MOV	R1, #0x34	@ 載入第二個位元組 (0x34)
+	LSL	R1, #16	@ 向左位移 16 個 bit 到對應的位置
+	ADD	R3, R1		@ 組合至 R3
+@ 重複操作處理第三個位元組
+	MOV	R1, #0x56	@ 載入第三個位元組 (0x56)
+	LSL	R1, #8		@ 向左位移 8 個 bit 到對應的位置
+	ADD	R3, R1		@ 組合至 R3
+@ 最後一個位元組不需要位移
+	MOV	R1, #0x78	@ 載入第四個位元組 (0x78)
+	ADD	R3, R1      @ 完成 0x12345678 的建構
 
-@ Other registers for our upcoming 64-bit addition
+@ 為接下來的 64 位元加法準備其他暫存器
 	MOV	R2, #0x12
 	MOV	R4, #0x54
 	MOV	R5, #0xf0
-	LSL	R5, #24		@ shift f0 over to the high byte
+	LSL	R5, #24		@ 將 0xf0 向左位移至最高位元組 (變成 0xF0000000)
 
-@ 64-bit Addition (rigged to cause a carry)
-@ Do sum:
-@		R2 R3	0x12 0x12345678
-@		R4 R5   0x54 0xF0000000
-@		-----
-@		R0 R1   0x67 0x02345678
+@ 64 位元加法（特別設計以觸發進位 Carry）
+@ 計算算式：
+@		R2 R3	0x00000012 0x12345678
+@	+	R4 R5	0x00000054 0xF0000000
+@		-----------------------------
+@		R0 R1	0x00000067 0x02345678
 
-	ADD	R1, R3, R5	@ Lower order word
-	ADC	R2, R4		@ Higher order word
-	MOV	R0, R2		@ Move the result to where we want it
+	ADD	R1, R3, R5	@ 加總低位元組 (Lower order word)
+	ADC	R2, R4		@ 加總高位元組 (Higher order word)，並加上剛才產生的進位 (Carry)
+	MOV	R0, R2		@ 將高位元組結果移至目標暫存器 R0
 
-@ Save R0, R1 since printf will overwrite them
-	MOV	R6, R0		@ R6 = R0
-	MOV	R7, R1		@ R7 = R1
+@ 儲存 R0, R1，因為呼叫 printf 時這兩個暫存器的值會被覆寫
+	MOV	R6, R0		@ R6 = R0 (高位 32 位元)
+	MOV	R7, R1		@ R7 = R1 (低位 32 位元)
 
-@ print out the sum
-loop:	MOV	R1, R6		@ R1 is param2
-	MOV	R2, R7		@ R2 is param3
-	LDR	R0, =sumstr	@ load address of sumstr to param1
-	BL	printf		@ call printf
-	B	loop		@ loop in case uart monitoring not started
+@ 印出 64 位元加法的結果
+loop:	MOV	R1, R6		@ R1 為 printf 的第二個參數 (高位結果)
+	MOV	R2, R7		@ R2 為 printf 的第三個參數 (低位結果)
+	LDR	R0, =sumstr	@ 將 sumstr 字串位址載入至 R0 (第一個參數)
+	BL	printf		@ 呼叫 printf
+	B	loop		@ 無窮迴圈（防止 UART 監控尚未開啟時跳出）
+
 .data
-	       .align  4	@ necessary alignment
+	.align 4            @ 記憶體對齊 4 位元組（必要設定）
 sumstr: .asciz   "The sum is %x %x\n"
-
-
-
